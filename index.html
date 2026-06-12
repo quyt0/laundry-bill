@@ -83,12 +83,13 @@
             { name: "Áo Vest", department: "Khách", unit: "chiếc", price: 50000 }
         ];
 
+        // ĐÃ ĐẢO VỊ TRÍ: Số lượng lên trước ĐVT
         let columns = [
             { id: 'stt', name: 'STT', required: true, visible: true },
             { id: 'date', name: 'Ngày', required: true, visible: true },
             { id: 'department', name: 'Bộ phận', required: false, visible: true },
-            { id: 'unit', name: 'ĐVT', required: true, visible: true },
             { id: 'qty', name: 'Số lượng', required: true, visible: true, type: 'number' },
+            { id: 'unit', name: 'ĐVT', required: true, visible: true },
             { id: 'price', name: 'Đơn giá', required: true, visible: true, type: 'number' },
             { id: 'total', name: 'Thành tiền', required: true, visible: true, isMath: true },
             { id: 'note', name: 'Ghi chú', required: false, visible: true }
@@ -103,7 +104,6 @@
             if (tab === 'preview') renderTable();
         }
 
-        // Cập nhật Tiêu đề động
         function updateTitle() {
             let inputVal = document.getElementById('bill-title-input').value;
             document.getElementById('bill-title-display').innerText = inputVal.trim() !== '' ? inputVal : 'KHÁCH LẺ';
@@ -126,11 +126,10 @@
             return num ? num.toLocaleString('vi-VN') : '0';
         }
 
-        // Chuyển format Date cho UI hiển thị
         function formatDateToDisplay(dateString) {
             if (!dateString) return '';
             const parts = dateString.split('-');
-            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
             return dateString;
         }
 
@@ -199,7 +198,6 @@
         }
 
         function addDateCard() {
-            // Lấy ngày chuẩn YYYY-MM-DD để gán vào input type="date"
             const today = new Date();
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -288,7 +286,6 @@
                         if (col.id === 'stt') {
                             if (itemIndex === 0) tbodyHtml += `<td class="font-bold ${stickyClass}" rowspan="${itemsCount}">${sttCounter++}</td>`;
                         } else if (col.id === 'date') {
-                            // Format lại ngày để hiển thị trên bảng
                             if (itemIndex === 0) tbodyHtml += `<td class="${stickyClass}" rowspan="${itemsCount}">${formatDateToDisplay(dayGroup.date)}</td>`;
                         } else if (col.id === 'department' && col.visible) {
                             if (deptSpans[itemIndex] > 0) tbodyHtml += `<td rowspan="${deptSpans[itemIndex]}">${item.department || ''}</td>`;
@@ -319,35 +316,38 @@
             document.getElementById('table-footer').innerHTML = tfootHtml;
         }
 
-        // HÀM XUẤT ẢNH (ĐÃ FIX LỖI BỊ CROP TRÊN ĐIỆN THOẠI)
+        // ĐÃ FIX: Ép width max-content và thêm padding 20px để chống crop lề phải
         function exportImage() {
             const printArea = document.getElementById('invoice-print-area');
             const wrapper = document.getElementById('main-wrapper');
             
-            // 1. Tạm thời tắt cuộn ngang và ép phần tử hiển thị full width
+            // Lưu lại style cũ
             const originalOverflow = wrapper.style.overflowX;
             const originalWidth = printArea.style.width;
+            const originalDisplay = printArea.style.display;
+            const originalPadding = printArea.style.padding;
             
+            // Set style để html2canvas nhận diện chuẩn toàn bộ bảng
             wrapper.style.overflowX = 'visible';
-            printArea.style.width = printArea.scrollWidth + 'px'; 
+            printArea.style.display = 'inline-block';
+            printArea.style.width = 'max-content'; 
+            printArea.style.padding = '20px'; 
 
-            // 2. Bỏ thuộc tính sticky để tránh vỡ UI khi chụp
             const stickies = document.querySelectorAll('.sticky-col-1, .sticky-col-2');
             stickies.forEach(el => { el.style.position = 'static'; el.style.borderRight = '1px solid #000'; });
 
-            // 3. Tiến hành chụp ảnh
             html2canvas(printArea, { 
                 scale: 2, 
                 useCORS: true, 
-                backgroundColor: '#ffffff',
-                windowWidth: printArea.scrollWidth // Ép html2canvas nhận diện width chuẩn
+                backgroundColor: '#ffffff'
             }).then(canvas => {
-                // 4. Khôi phục lại giao diện như cũ
+                // Khôi phục lại giao diện ngay sau khi chụp xong
                 wrapper.style.overflowX = originalOverflow;
                 printArea.style.width = originalWidth;
+                printArea.style.display = originalDisplay;
+                printArea.style.padding = originalPadding;
                 stickies.forEach(el => { el.style.position = 'sticky'; el.style.borderRight = '2px solid #000'; });
 
-                // 5. Tải ảnh
                 const imgData = canvas.toDataURL('image/png');
                 const link = document.createElement('a');
                 let fileName = document.getElementById('bill-title-input').value.replace(/[^a-zA-Z0-9]/g, '_') || 'Khach_Le';
