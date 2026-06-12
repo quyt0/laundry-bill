@@ -17,9 +17,6 @@
         table { border-collapse: collapse; width: 100%; min-width: 800px; }
         th, td { border: 1px solid #000; padding: 12px 8px; text-align: center; font-size: 14px; }
         th { background-color: #e5e7eb; font-weight: bold; }
-        .sticky-col-1 { position: sticky; left: 0; background-color: #f3f4f6; z-index: 10; border-right: 2px solid #000;}
-        .sticky-col-2 { position: sticky; left: 40px; background-color: #f3f4f6; z-index: 10; border-right: 2px solid #000;}
-        th.sticky-col-1, th.sticky-col-2 { background-color: #d1d5db; z-index: 20; }
         .hidden-tab { display: none; }
     </style>
 </head>
@@ -83,7 +80,6 @@
             { name: "Áo Vest", department: "Khách", unit: "chiếc", price: 50000 }
         ];
 
-        // ĐÃ ĐẢO VỊ TRÍ: Số lượng lên trước ĐVT
         let columns = [
             { id: 'stt', name: 'STT', required: true, visible: true },
             { id: 'date', name: 'Ngày', required: true, visible: true },
@@ -243,9 +239,8 @@
             const visibleCols = columns.filter(c => c.visible);
             
             let theadHtml = '';
-            visibleCols.forEach((col, idx) => {
-                let stickyClass = idx === 0 ? 'sticky-col-1' : (idx === 1 ? 'sticky-col-2' : '');
-                theadHtml += `<th class="${stickyClass}">${col.name}</th>`;
+            visibleCols.forEach(col => {
+                theadHtml += `<th>${col.name}</th>`;
             });
             document.getElementById('table-header').innerHTML = theadHtml;
 
@@ -280,13 +275,11 @@
                     grandTotalPrice += total;
 
                     tbodyHtml += `<tr>`;
-                    visibleCols.forEach((col, colIdx) => {
-                        let stickyClass = colIdx === 0 ? 'sticky-col-1' : (colIdx === 1 ? 'sticky-col-2' : '');
-
+                    visibleCols.forEach(col => {
                         if (col.id === 'stt') {
-                            if (itemIndex === 0) tbodyHtml += `<td class="font-bold ${stickyClass}" rowspan="${itemsCount}">${sttCounter++}</td>`;
+                            if (itemIndex === 0) tbodyHtml += `<td class="font-bold" rowspan="${itemsCount}">${sttCounter++}</td>`;
                         } else if (col.id === 'date') {
-                            if (itemIndex === 0) tbodyHtml += `<td class="${stickyClass}" rowspan="${itemsCount}">${formatDateToDisplay(dayGroup.date)}</td>`;
+                            if (itemIndex === 0) tbodyHtml += `<td rowspan="${itemsCount}">${formatDateToDisplay(dayGroup.date)}</td>`;
                         } else if (col.id === 'department' && col.visible) {
                             if (deptSpans[itemIndex] > 0) tbodyHtml += `<td rowspan="${deptSpans[itemIndex]}">${item.department || ''}</td>`;
                         } else if (col.id === 'total') {
@@ -304,9 +297,7 @@
 
             let tfootHtml = `<tr class="font-bold text-red-600 bg-red-50 text-lg">`;
             visibleCols.forEach((col, colIdx) => {
-                let stickyClass = colIdx === 0 ? 'sticky-col-1' : (colIdx === 1 ? 'sticky-col-2' : '');
-                
-                if (colIdx === 0) tfootHtml += `<td class="${stickyClass}" colspan="2" style="text-align: right; padding-right: 20px;">Tổng cộng:</td>`;
+                if (colIdx === 0) tfootHtml += `<td colspan="2" style="text-align: right; padding-right: 20px;">Tổng cộng:</td>`;
                 else if (colIdx === 1) tfootHtml += ``; 
                 else if (col.id === 'qty') tfootHtml += `<td>${formatCurrency(grandTotalQty)}</td>`;
                 else if (col.id === 'total') tfootHtml += `<td>${formatCurrency(grandTotalPrice)}</td>`;
@@ -316,37 +307,30 @@
             document.getElementById('table-footer').innerHTML = tfootHtml;
         }
 
-        // ĐÃ FIX: Ép width max-content và thêm padding 20px để chống crop lề phải
         function exportImage() {
             const printArea = document.getElementById('invoice-print-area');
             const wrapper = document.getElementById('main-wrapper');
             
-            // Lưu lại style cũ
             const originalOverflow = wrapper.style.overflowX;
             const originalWidth = printArea.style.width;
             const originalDisplay = printArea.style.display;
             const originalPadding = printArea.style.padding;
             
-            // Set style để html2canvas nhận diện chuẩn toàn bộ bảng
             wrapper.style.overflowX = 'visible';
             printArea.style.display = 'inline-block';
             printArea.style.width = 'max-content'; 
             printArea.style.padding = '20px'; 
 
-            const stickies = document.querySelectorAll('.sticky-col-1, .sticky-col-2');
-            stickies.forEach(el => { el.style.position = 'static'; el.style.borderRight = '1px solid #000'; });
-
             html2canvas(printArea, { 
                 scale: 2, 
                 useCORS: true, 
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                windowWidth: printArea.scrollWidth
             }).then(canvas => {
-                // Khôi phục lại giao diện ngay sau khi chụp xong
                 wrapper.style.overflowX = originalOverflow;
                 printArea.style.width = originalWidth;
                 printArea.style.display = originalDisplay;
                 printArea.style.padding = originalPadding;
-                stickies.forEach(el => { el.style.position = 'sticky'; el.style.borderRight = '2px solid #000'; });
 
                 const imgData = canvas.toDataURL('image/png');
                 const link = document.createElement('a');
