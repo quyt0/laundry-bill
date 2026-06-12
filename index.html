@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png"> <title>Hóa Đơn Giặt Là</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { border-collapse: collapse; width: 100%; min-width: 800px; }
+        th, td { border: 1px solid #000; padding: 12px 8px; text-align: center; font-size: 14px; }
+        th { background-color: #e5e7eb; font-weight: bold; }
+        .sticky-col-1 { position: sticky; left: 0; background-color: #f3f4f6; z-index: 10; border-right: 2px solid #000;}
+        .sticky-col-2 { position: sticky; left: 40px; background-color: #f3f4f6; z-index: 10; border-right: 2px solid #000;}
+        th.sticky-col-1, th.sticky-col-2 { background-color: #d1d5db; z-index: 20; }
+        .hidden-tab { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans pb-24">
+
+    <div class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-50">
+        <h1 class="text-xl font-bold">App Hóa Đơn</h1>
+        <div class="space-x-2">
+            <button onclick="switchTab('input')" class="bg-blue-800 px-4 py-2 rounded font-bold text-sm">Nhập liệu</button>
+            <button onclick="switchTab('preview')" class="bg-blue-800 px-4 py-2 rounded font-bold text-sm">Xem & In</button>
+        </div>
+    </div>
+
+    <div id="tab-input" class="p-4">
+        <div class="bg-white p-4 rounded-xl shadow mb-6 border border-gray-200">
+            <h2 class="font-bold text-lg mb-3">Tùy chỉnh cột phụ</h2>
+            <div id="column-toggles" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div id="cards-container" class="space-y-6"></div>
+        
+        <button onclick="addDateCard()" class="mt-6 w-full bg-green-600 text-white font-bold py-4 rounded-xl text-lg shadow-lg active:bg-green-700">
+            + THÊM NGÀY MỚI
+        </button>
+    </div>
+
+    <div id="tab-preview" class="p-4 hidden-tab">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="font-bold text-lg">Bản xem trước</h2>
+            <button onclick="exportPDF()" class="bg-red-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg active:bg-red-700">
+                Xuất PDF
+            </button>
+        </div>
+        <div class="table-wrapper bg-white shadow-lg border border-gray-300">
+            <div id="invoice-print-area" class="p-2 bg-white">
+                <h2 class="text-center font-bold text-2xl mb-6 mt-4">BẢNG KÊ CHI TIẾT GIẶT LÀ</h2>
+                <table id="invoice-table">
+                    <thead><tr id="table-header"></tr></thead>
+                    <tbody id="table-body"></tbody>
+                    <tfoot id="table-footer"></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CẤU HÌNH DỊCH VỤ THƯỜNG DÙNG (THÊM NHANH)
+        const QUICK_SERVICES = [
+            { name: "Giặt kg", department: "HK", unit: "kg", price: 12000 },
+            { name: "Lõi chăn", department: "HK", unit: "lõi chăn", price: 70000 },
+            { name: "Khăn lạnh", department: "Nhà hàng", unit: "chiếc", price: 2000 },
+            { name: "Áo Vest", department: "Khách", unit: "chiếc", price: 50000 }
+        ];
+
+        // CẤU HÌNH CỘT
+        let columns = [
+            { id: 'stt', name: 'STT', required: true, visible: true },
+            { id: 'date', name: 'Ngày', required: true, visible: true },
+            { id: 'department', name: 'Bộ phận', required: false, visible: true },
+            { id: 'unit', name: 'ĐVT', required: true, visible: true },
+            { id: 'qty', name: 'Số lượng', required: true, visible: true, type: 'number' },
+            { id: 'price', name: 'Đơn giá', required: true, visible: true, type: 'number' },
+            { id: 'total', name: 'Thành tiền', required: true, visible: true, isMath: true },
+            { id: 'note', name: 'Ghi chú', required: false, visible: true }
+        ];
+
+        // DỮ LIỆU STATE
+        let data = [];
+
+        function switchTab(tab) {
+            document.getElementById('tab-input').classList.add('hidden-tab');
+            document.getElementById('tab-preview').classList.add('hidden-tab');
+            document.getElementById(`tab-${tab}`).classList.remove('hidden-tab');
+            if (tab === 'preview') renderTable();
+        }
+
+        function renderColumnToggles() {
+            const container = document.getElementById('column-toggles');
+            container.innerHTML = '';
+            columns.forEach(col => {
+                if (col.required) return;
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 rounded-full text-sm font-bold border ${col.visible ? 'bg-blue-100 text-blue-700 border-blue-400' : 'bg-gray-100 text-gray-500 border-gray-300'}`;
+                btn.innerText = col.name;
+                btn.onclick = () => { col.visible = !col.visible; renderColumnToggles(); renderInputCards(); };
+                container.appendChild(btn);
+            });
+        }
+
+        function formatCurrency(num) {
+            return num ? num.toLocaleString('vi-VN') : '0';
+        }
+
+        function renderInputCards() {
+            const container = document.getElementById('cards-container');
+            container.innerHTML = '';
+
+            data.forEach((dayGroup, groupIndex) => {
+                let html = `
+                <div class="bg-white rounded-2xl shadow-md border-l-8 border-blue-500 overflow-hidden mb-6">
+                    <div class="bg-blue-50 p-4 border-b flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-gray-700 text-lg">Ngày:</span>
+                            <input type="text" placeholder="VD: 1/4/2026" value="${dayGroup.date}" onchange="updateDate(${groupIndex}, this.value)" class="border border-gray-300 rounded-lg p-2 text-lg font-bold w-36 bg-white outline-none focus:border-blue-500">
+                        </div>
+                        <button onclick="removeDateCard(${groupIndex})" class="text-red-500 font-bold p-2 text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="p-3 space-y-3">`;
+                
+                // Hiển thị các mặt hàng đã thêm
+                dayGroup.items.forEach((item, itemIndex) => {
+                    html += `<div class="bg-gray-50 p-4 rounded-xl border border-gray-200 relative shadow-sm">
+                                <button onclick="removeItem(${groupIndex}, ${itemIndex})" class="absolute top-2 right-2 text-red-500 font-bold bg-red-100 rounded-full w-10 h-10 flex items-center justify-center text-xl active:bg-red-200">&times;</button>
+                                <div class="grid grid-cols-2 gap-4 pr-10">`;
+                    
+                    columns.forEach(col => {
+                        if (['stt', 'date', 'total'].includes(col.id) || !col.visible) return;
+                        
+                        let inputType = col.type === 'number' ? 'number' : 'text';
+                        let val = item[col.id] !== undefined ? item[col.id] : '';
+                        
+                        // Cột số lượng để to hơn và dễ bấm
+                        let inputClass = col.id === 'qty' 
+                            ? "w-full border-2 border-blue-400 p-3 rounded-lg text-lg font-bold bg-white text-blue-700 outline-none" 
+                            : "w-full border border-gray-300 p-3 rounded-lg text-base outline-none bg-white";
+
+                        html += `<div>
+                                    <label class="block text-sm text-gray-600 font-bold mb-1">${col.name}</label>
+                                    <input type="${inputType}" value="${val}" placeholder="Nhập ${col.name}" onchange="updateItemData(${groupIndex}, ${itemIndex}, '${col.id}', this.value)" class="${inputClass}">
+                                 </div>`;
+                    });
+
+                    html += `   </div>
+                             </div>`;
+                });
+
+                // KHU VỰC THÊM NHANH (CÁCH 3)
+                html += `<div class="pt-2">
+                            <p class="text-sm font-bold text-gray-500 mb-2">Thêm nhanh dịch vụ:</p>
+                            <div class="flex flex-wrap gap-2">`;
+                
+                QUICK_SERVICES.forEach((srv, srvIdx) => {
+                    html += `<button onclick="addQuickItem(${groupIndex}, ${srvIdx})" class="bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-xl font-bold active:bg-blue-300 shadow-sm transition-colors text-sm">
+                                + ${srv.name}
+                             </button>`;
+                });
+
+                html += `   </div>
+                         </div>`;
+
+                // Nút thêm thủ công (Phòng khi có dịch vụ mới không nằm trong list)
+                html += `   <button onclick="addManualItem(${groupIndex})" class="w-full py-4 mt-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-xl flex justify-center items-center active:bg-gray-100 text-lg">
+                                + Thêm thủ công (Trống)
+                            </button>
+                    </div>
+                </div>`;
+                container.innerHTML += html;
+            });
+        }
+
+        function addDateCard() {
+            // Lấy ngày hôm nay làm mặc định cho tiện
+            const today = new Date();
+            const dateStr = today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear();
+            data.push({ id: Date.now(), date: dateStr, items: [] });
+            renderInputCards();
+        }
+
+        function addQuickItem(groupIndex, serviceIndex) {
+            const srv = QUICK_SERVICES[serviceIndex];
+            data[groupIndex].items.push({ 
+                id: Date.now(), 
+                department: srv.department, 
+                unit: srv.unit, 
+                price: srv.price, 
+                qty: '', // Để trống cho người dùng gõ
+                note: '' 
+            });
+            renderInputCards();
+        }
+
+        function addManualItem(groupIndex) {
+            data[groupIndex].items.push({ id: Date.now(), department: '', unit: '', qty: '', price: '', note: '' });
+            renderInputCards();
+        }
+
+        function removeDateCard(groupIndex) {
+            if(confirm('Xóa toàn bộ dữ liệu của ngày này?')) {
+                data.splice(groupIndex, 1);
+                renderInputCards();
+            }
+        }
+
+        function removeItem(groupIndex, itemIndex) {
+            data[groupIndex].items.splice(itemIndex, 1);
+            renderInputCards();
+        }
+
+        function updateDate(groupIndex, value) { data[groupIndex].date = value; }
+        
+        function updateItemData(groupIndex, itemIndex, field, value) {
+            let item = data[groupIndex].items[itemIndex];
+            item[field] = (field === 'qty' || field === 'price') ? Number(value) : value;
+        }
+
+        function renderTable() {
+            const visibleCols = columns.filter(c => c.visible);
+            
+            let theadHtml = '';
+            visibleCols.forEach((col, idx) => {
+                let stickyClass = idx === 0 ? 'sticky-col-1' : (idx === 1 ? 'sticky-col-2' : '');
+                theadHtml += `<th class="${stickyClass}">${col.name}</th>`;
+            });
+            document.getElementById('table-header').innerHTML = theadHtml;
+
+            let tbodyHtml = '';
+            let sttCounter = 1;
+            let grandTotalQty = 0;
+            let grandTotalPrice = 0;
+
+            data.forEach((dayGroup) => {
+                let itemsCount = dayGroup.items.length;
+                if (itemsCount === 0) return;
+
+                let deptSpans = [];
+                let currentDept = null;
+                let currentDeptCount = 0;
+
+                dayGroup.items.forEach((item, index) => {
+                    if (item.department === currentDept) {
+                        currentDeptCount++;
+                        deptSpans.push(0);
+                        deptSpans[index - currentDeptCount + 1] = currentDeptCount;
+                    } else {
+                        currentDept = item.department;
+                        currentDeptCount = 1;
+                        deptSpans.push(1);
+                    }
+                });
+
+                dayGroup.items.forEach((item, itemIndex) => {
+                    let total = (Number(item.qty) || 0) * (Number(item.price) || 0);
+                    grandTotalQty += Number(item.qty || 0);
+                    grandTotalPrice += total;
+
+                    tbodyHtml += `<tr>`;
+                    visibleCols.forEach((col, colIdx) => {
+                        let stickyClass = colIdx === 0 ? 'sticky-col-1' : (colIdx === 1 ? 'sticky-col-2' : '');
+
+                        if (col.id === 'stt') {
+                            if (itemIndex === 0) tbodyHtml += `<td class="font-bold ${stickyClass}" rowspan="${itemsCount}">${sttCounter++}</td>`;
+                        } else if (col.id === 'date') {
+                            if (itemIndex === 0) tbodyHtml += `<td class="${stickyClass}" rowspan="${itemsCount}">${dayGroup.date}</td>`;
+                        } else if (col.id === 'department' && col.visible) {
+                            if (deptSpans[itemIndex] > 0) tbodyHtml += `<td rowspan="${deptSpans[itemIndex]}">${item.department || ''}</td>`;
+                        } else if (col.id === 'total') {
+                            tbodyHtml += `<td>${formatCurrency(total)}</td>`;
+                        } else {
+                            let val = item[col.id] !== undefined ? item[col.id] : '';
+                            if (col.type === 'number' && val !== '') val = formatCurrency(Number(val));
+                            tbodyHtml += `<td>${val}</td>`;
+                        }
+                    });
+                    tbodyHtml += `</tr>`;
+                });
+            });
+            document.getElementById('table-body').innerHTML = tbodyHtml;
+
+            let tfootHtml = `<tr class="font-bold text-red-600 bg-red-50 text-lg">`;
+            visibleCols.forEach((col, colIdx) => {
+                let stickyClass = colIdx === 0 ? 'sticky-col-1' : (colIdx === 1 ? 'sticky-col-2' : '');
+                
+                if (colIdx === 0) tfootHtml += `<td class="${stickyClass}" colspan="2" style="text-align: right; padding-right: 20px;">Tổng cộng:</td>`;
+                else if (colIdx === 1) tfootHtml += ``; 
+                else if (col.id === 'qty') tfootHtml += `<td>${formatCurrency(grandTotalQty)}</td>`;
+                else if (col.id === 'total') tfootHtml += `<td>${formatCurrency(grandTotalPrice)}</td>`;
+                else tfootHtml += `<td></td>`;
+            });
+            tfootHtml += `</tr>`;
+            document.getElementById('table-footer').innerHTML = tfootHtml;
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('invoice-print-area');
+            const opt = {
+                margin:       0.3,
+                filename:     `Bang_Ke_Giat_La_${Date.now()}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+            };
+            
+            const stickies = document.querySelectorAll('.sticky-col-1, .sticky-col-2');
+            stickies.forEach(el => { el.style.position = 'static'; el.style.borderRight = '1px solid #000'; });
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                stickies.forEach(el => { el.style.position = 'sticky'; el.style.borderRight = '2px solid #000'; });
+            });
+        }
+
+        // Khởi tạo app (Thêm sẵn 1 ngày làm mẫu)
+        renderColumnToggles();
+        addDateCard(); 
+    </script>
+</body>
+</html>
