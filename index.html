@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.png"> <title>Hóa Đơn Giặt Là</title>
+    <link rel="apple-touch-icon" href="icon.png"> 
+    <title>Hóa Đơn Giặt Là</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
         body { -webkit-tap-highlight-color: transparent; }
@@ -48,8 +49,8 @@
     <div id="tab-preview" class="p-4 hidden-tab">
         <div class="flex justify-between items-center mb-4">
             <h2 class="font-bold text-lg">Bản xem trước</h2>
-            <button onclick="exportPDF()" class="bg-red-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg active:bg-red-700">
-                Xuất PDF
+            <button onclick="exportImage()" class="bg-green-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg active:bg-green-700">
+                Tải Ảnh
             </button>
         </div>
         <div class="table-wrapper bg-white shadow-lg border border-gray-300">
@@ -65,7 +66,6 @@
     </div>
 
     <script>
-        // CẤU HÌNH DỊCH VỤ THƯỜNG DÙNG (THÊM NHANH)
         const QUICK_SERVICES = [
             { name: "Giặt kg", department: "HK", unit: "kg", price: 12000 },
             { name: "Lõi chăn", department: "HK", unit: "lõi chăn", price: 70000 },
@@ -73,7 +73,6 @@
             { name: "Áo Vest", department: "Khách", unit: "chiếc", price: 50000 }
         ];
 
-        // CẤU HÌNH CỘT
         let columns = [
             { id: 'stt', name: 'STT', required: true, visible: true },
             { id: 'date', name: 'Ngày', required: true, visible: true },
@@ -85,7 +84,6 @@
             { id: 'note', name: 'Ghi chú', required: false, visible: true }
         ];
 
-        // DỮ LIỆU STATE
         let data = [];
 
         function switchTab(tab) {
@@ -129,7 +127,6 @@
                     
                     <div class="p-3 space-y-3">`;
                 
-                // Hiển thị các mặt hàng đã thêm
                 dayGroup.items.forEach((item, itemIndex) => {
                     html += `<div class="bg-gray-50 p-4 rounded-xl border border-gray-200 relative shadow-sm">
                                 <button onclick="removeItem(${groupIndex}, ${itemIndex})" class="absolute top-2 right-2 text-red-500 font-bold bg-red-100 rounded-full w-10 h-10 flex items-center justify-center text-xl active:bg-red-200">&times;</button>
@@ -141,7 +138,6 @@
                         let inputType = col.type === 'number' ? 'number' : 'text';
                         let val = item[col.id] !== undefined ? item[col.id] : '';
                         
-                        // Cột số lượng để to hơn và dễ bấm
                         let inputClass = col.id === 'qty' 
                             ? "w-full border-2 border-blue-400 p-3 rounded-lg text-lg font-bold bg-white text-blue-700 outline-none" 
                             : "w-full border border-gray-300 p-3 rounded-lg text-base outline-none bg-white";
@@ -156,7 +152,6 @@
                              </div>`;
                 });
 
-                // KHU VỰC THÊM NHANH (CÁCH 3)
                 html += `<div class="pt-2">
                             <p class="text-sm font-bold text-gray-500 mb-2">Thêm nhanh dịch vụ:</p>
                             <div class="flex flex-wrap gap-2">`;
@@ -170,7 +165,6 @@
                 html += `   </div>
                          </div>`;
 
-                // Nút thêm thủ công (Phòng khi có dịch vụ mới không nằm trong list)
                 html += `   <button onclick="addManualItem(${groupIndex})" class="w-full py-4 mt-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-xl flex justify-center items-center active:bg-gray-100 text-lg">
                                 + Thêm thủ công (Trống)
                             </button>
@@ -181,7 +175,6 @@
         }
 
         function addDateCard() {
-            // Lấy ngày hôm nay làm mặc định cho tiện
             const today = new Date();
             const dateStr = today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear();
             data.push({ id: Date.now(), date: dateStr, items: [] });
@@ -195,7 +188,7 @@
                 department: srv.department, 
                 unit: srv.unit, 
                 price: srv.price, 
-                qty: '', // Để trống cho người dùng gõ
+                qty: '', 
                 note: '' 
             });
             renderInputCards();
@@ -302,25 +295,32 @@
             document.getElementById('table-footer').innerHTML = tfootHtml;
         }
 
-        function exportPDF() {
+        // HÀM XUẤT ẢNH MỚI BẰNG HTML2CANVAS
+        function exportImage() {
             const element = document.getElementById('invoice-print-area');
-            const opt = {
-                margin:       0.3,
-                filename:     `Bang_Ke_Giat_La_${Date.now()}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-            };
             
+            // Tạm thời tắt tính năng "Ghim cột" (sticky) vì html2canvas thường bị lỗi hiển thị với thuộc tính này
             const stickies = document.querySelectorAll('.sticky-col-1, .sticky-col-2');
             stickies.forEach(el => { el.style.position = 'static'; el.style.borderRight = '1px solid #000'; });
 
-            html2pdf().set(opt).from(element).save().then(() => {
+            // Cấu hình scale x2 để ảnh xuất ra cực nét, zoom lên không bị vỡ
+            html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+                // Khôi phục lại giao diện sau khi chụp xong
                 stickies.forEach(el => { el.style.position = 'sticky'; el.style.borderRight = '2px solid #000'; });
+
+                // Lấy dữ liệu ảnh dạng base64
+                const imgData = canvas.toDataURL('image/png');
+                
+                // Tạo thẻ <a> ẩn để tự động kích hoạt tải xuống
+                const link = document.createElement('a');
+                link.download = `Bang_Ke_Giat_La_${Date.now()}.png`;
+                link.href = imgData;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             });
         }
 
-        // Khởi tạo app (Thêm sẵn 1 ngày làm mẫu)
         renderColumnToggles();
         addDateCard(); 
     </script>
