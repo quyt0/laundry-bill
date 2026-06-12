@@ -34,6 +34,13 @@
     </div>
 
     <div id="tab-input" class="p-4">
+        
+        <div class="bg-white p-4 rounded-xl shadow mb-6 border border-gray-200">
+            <h2 class="font-bold text-lg mb-2 text-blue-700">Thông tin chung</h2>
+            <label class="block text-sm text-gray-600 font-bold mb-1">Tên khách hàng / Căn hộ</label>
+            <input type="text" id="bill-title-input" placeholder="VD: Căn Forest..." onkeyup="updateTitle()" onchange="updateTitle()" class="w-full border-2 border-gray-300 p-3 rounded-lg text-lg font-bold outline-none focus:border-blue-500 bg-gray-50">
+        </div>
+
         <div class="bg-white p-4 rounded-xl shadow mb-6 border border-gray-200">
             <h2 class="font-bold text-lg mb-3">Tùy chỉnh cột phụ</h2>
             <div id="column-toggles" class="flex flex-wrap gap-2"></div>
@@ -53,9 +60,12 @@
                 Tải Ảnh
             </button>
         </div>
-        <div class="table-wrapper bg-white shadow-lg border border-gray-300">
-            <div id="invoice-print-area" class="p-2 bg-white">
-                <h2 class="text-center font-bold text-2xl mb-6 mt-4">BẢNG KÊ CHI TIẾT GIẶT LÀ</h2>
+        
+        <div class="table-wrapper bg-white shadow-lg border border-gray-300" id="main-wrapper">
+            <div id="invoice-print-area" class="p-4 bg-white">
+                <h2 class="text-center font-bold text-2xl mt-2 mb-1">BẢNG KÊ CHI TIẾT GIẶT LÀ</h2>
+                <h3 class="text-center font-bold text-xl text-blue-700 mb-6 uppercase" id="bill-title-display">KHÁCH LẺ</h3>
+                
                 <table id="invoice-table">
                     <thead><tr id="table-header"></tr></thead>
                     <tbody id="table-body"></tbody>
@@ -93,6 +103,12 @@
             if (tab === 'preview') renderTable();
         }
 
+        // Cập nhật Tiêu đề động
+        function updateTitle() {
+            let inputVal = document.getElementById('bill-title-input').value;
+            document.getElementById('bill-title-display').innerText = inputVal.trim() !== '' ? inputVal : 'KHÁCH LẺ';
+        }
+
         function renderColumnToggles() {
             const container = document.getElementById('column-toggles');
             container.innerHTML = '';
@@ -110,6 +126,14 @@
             return num ? num.toLocaleString('vi-VN') : '0';
         }
 
+        // Chuyển format Date cho UI hiển thị
+        function formatDateToDisplay(dateString) {
+            if (!dateString) return '';
+            const parts = dateString.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+            return dateString;
+        }
+
         function renderInputCards() {
             const container = document.getElementById('cards-container');
             container.innerHTML = '';
@@ -118,11 +142,11 @@
                 let html = `
                 <div class="bg-white rounded-2xl shadow-md border-l-8 border-blue-500 overflow-hidden mb-6">
                     <div class="bg-blue-50 p-4 border-b flex justify-between items-center">
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-2 flex-1">
                             <span class="font-bold text-gray-700 text-lg">Ngày:</span>
-                            <input type="text" placeholder="VD: 1/4/2026" value="${dayGroup.date}" onchange="updateDate(${groupIndex}, this.value)" class="border border-gray-300 rounded-lg p-2 text-lg font-bold w-36 bg-white outline-none focus:border-blue-500">
+                            <input type="date" value="${dayGroup.date}" onchange="updateDate(${groupIndex}, this.value)" class="border border-gray-300 rounded-lg p-2 text-lg font-bold flex-1 bg-white outline-none focus:border-blue-500">
                         </div>
-                        <button onclick="removeDateCard(${groupIndex})" class="text-red-500 font-bold p-2 text-2xl">&times;</button>
+                        <button onclick="removeDateCard(${groupIndex})" class="text-red-500 font-bold pl-4 text-2xl">&times;</button>
                     </div>
                     
                     <div class="p-3 space-y-3">`;
@@ -175,21 +199,20 @@
         }
 
         function addDateCard() {
+            // Lấy ngày chuẩn YYYY-MM-DD để gán vào input type="date"
             const today = new Date();
-            const dateStr = today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear();
-            data.push({ id: Date.now(), date: dateStr, items: [] });
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            
+            data.push({ id: Date.now(), date: `${yyyy}-${mm}-${dd}`, items: [] });
             renderInputCards();
         }
 
         function addQuickItem(groupIndex, serviceIndex) {
             const srv = QUICK_SERVICES[serviceIndex];
             data[groupIndex].items.push({ 
-                id: Date.now(), 
-                department: srv.department, 
-                unit: srv.unit, 
-                price: srv.price, 
-                qty: '', 
-                note: '' 
+                id: Date.now(), department: srv.department, unit: srv.unit, price: srv.price, qty: '', note: '' 
             });
             renderInputCards();
         }
@@ -265,7 +288,8 @@
                         if (col.id === 'stt') {
                             if (itemIndex === 0) tbodyHtml += `<td class="font-bold ${stickyClass}" rowspan="${itemsCount}">${sttCounter++}</td>`;
                         } else if (col.id === 'date') {
-                            if (itemIndex === 0) tbodyHtml += `<td class="${stickyClass}" rowspan="${itemsCount}">${dayGroup.date}</td>`;
+                            // Format lại ngày để hiển thị trên bảng
+                            if (itemIndex === 0) tbodyHtml += `<td class="${stickyClass}" rowspan="${itemsCount}">${formatDateToDisplay(dayGroup.date)}</td>`;
                         } else if (col.id === 'department' && col.visible) {
                             if (deptSpans[itemIndex] > 0) tbodyHtml += `<td rowspan="${deptSpans[itemIndex]}">${item.department || ''}</td>`;
                         } else if (col.id === 'total') {
@@ -295,25 +319,39 @@
             document.getElementById('table-footer').innerHTML = tfootHtml;
         }
 
-        // HÀM XUẤT ẢNH MỚI BẰNG HTML2CANVAS
+        // HÀM XUẤT ẢNH (ĐÃ FIX LỖI BỊ CROP TRÊN ĐIỆN THOẠI)
         function exportImage() {
-            const element = document.getElementById('invoice-print-area');
+            const printArea = document.getElementById('invoice-print-area');
+            const wrapper = document.getElementById('main-wrapper');
             
-            // Tạm thời tắt tính năng "Ghim cột" (sticky) vì html2canvas thường bị lỗi hiển thị với thuộc tính này
+            // 1. Tạm thời tắt cuộn ngang và ép phần tử hiển thị full width
+            const originalOverflow = wrapper.style.overflowX;
+            const originalWidth = printArea.style.width;
+            
+            wrapper.style.overflowX = 'visible';
+            printArea.style.width = printArea.scrollWidth + 'px'; 
+
+            // 2. Bỏ thuộc tính sticky để tránh vỡ UI khi chụp
             const stickies = document.querySelectorAll('.sticky-col-1, .sticky-col-2');
             stickies.forEach(el => { el.style.position = 'static'; el.style.borderRight = '1px solid #000'; });
 
-            // Cấu hình scale x2 để ảnh xuất ra cực nét, zoom lên không bị vỡ
-            html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
-                // Khôi phục lại giao diện sau khi chụp xong
+            // 3. Tiến hành chụp ảnh
+            html2canvas(printArea, { 
+                scale: 2, 
+                useCORS: true, 
+                backgroundColor: '#ffffff',
+                windowWidth: printArea.scrollWidth // Ép html2canvas nhận diện width chuẩn
+            }).then(canvas => {
+                // 4. Khôi phục lại giao diện như cũ
+                wrapper.style.overflowX = originalOverflow;
+                printArea.style.width = originalWidth;
                 stickies.forEach(el => { el.style.position = 'sticky'; el.style.borderRight = '2px solid #000'; });
 
-                // Lấy dữ liệu ảnh dạng base64
+                // 5. Tải ảnh
                 const imgData = canvas.toDataURL('image/png');
-                
-                // Tạo thẻ <a> ẩn để tự động kích hoạt tải xuống
                 const link = document.createElement('a');
-                link.download = `Bang_Ke_Giat_La_${Date.now()}.png`;
+                let fileName = document.getElementById('bill-title-input').value.replace(/[^a-zA-Z0-9]/g, '_') || 'Khach_Le';
+                link.download = `Hoa_Don_${fileName}_${Date.now()}.png`;
                 link.href = imgData;
                 document.body.appendChild(link);
                 link.click();
@@ -323,6 +361,7 @@
 
         renderColumnToggles();
         addDateCard(); 
+        updateTitle();
     </script>
 </body>
 </html>
